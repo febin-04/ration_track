@@ -1,26 +1,101 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #f8fafc;
+  --foreground: #0f172a;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.5;
+}
+
+/* Accessibility: Large Text Mode */
+.large-text-mode {
+  font-size: 1.25rem !important;
+}
+
+.large-text-mode h1 {
+  font-size: 2.25rem !important;
+}
+
+.large-text-mode h2 {
+  font-size: 1.85rem !important;
+}
+
+.large-text-mode h3 {
+  font-size: 1.5rem !important;
+}
+
+.large-text-mode button,
+.large-text-mode a,
+.large-text-mode input,
+.large-text-mode select {
+  font-size: 1.2rem !important;
+  min-height: 52px !important;
+  min-width: 52px !important;
+}
+
+/* Accessibility: High Contrast Mode */
+.high-contrast-mode {
+  background-color: #000000 !important;
+  color: #ffff00 !important;
+}
+
+.high-contrast-mode header,
+.high-contrast-mode footer,
+.high-contrast-mode div,
+.high-contrast-mode main,
+.high-contrast-mode article,
+.high-contrast-mode section {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border-color: #ffff00 !important;
+}
+
+.high-contrast-mode button,
+.high-contrast-mode a.btn {
+  background-color: #ffff00 !important;
+  color: #000000 !important;
+  font-weight: bold !important;
+  border: 2px solid #ffffff !important;
+}
+
+.high-contrast-mode input,
+.high-contrast-mode select,
+.high-contrast-mode textarea {
+  background-color: #1a1a1a !important;
+  color: #ffff00 !important;
+  border: 2px solid #ffff00 !important;
+}
+
+.high-contrast-mode .badge-available {
+  background-color: #00ff00 !important;
+  color: #000000 !important;
+  font-weight: 900 !important;
+}
+
+.high-contrast-mode .badge-low {
+  background-color: #ffff00 !important;
+  color: #000000 !important;
+  font-weight: 900 !important;
+}
+
+.high-contrast-mode .badge-out {
+  background-color: #ff0000 !important;
+  color: #ffffff !important;
+  font-weight: 900 !important;
+}
+
+/* Focus indicator for keyboard & screen reader accessibility */
+*:focus-visible {
+  outline: 4px solid #2563eb !important;
+  outline-offset: 2px !important;
+}
+
+.high-contrast-mode *:focus-visible {
+  outline: 4px solid #ffff00 !important;
+  outline-offset: 3px !important;
 }
