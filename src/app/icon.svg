@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <rect width="512" height="512" rx="128" fill="#065F46"/>
+  <!-- Store Roof / Canopy -->
+  <path d="M256 80 L96 180 H416 Z" fill="#F59E0B"/>
+  <!-- Pillar Columns -->
+  <rect x="128" y="196" width="36" height="130" rx="8" fill="#FCD34D"/>
+  <rect x="238" y="196" width="36" height="130" rx="8" fill="#FCD34D"/>
+  <rect x="348" y="196" width="36" height="130" rx="8" fill="#FCD34D"/>
+  <!-- Store Base -->
+  <rect x="96" y="326" width="320" height="36" rx="10" fill="#F59E0B"/>
+  <!-- Wheat Stalk / Grain Motif -->
+  <path d="M256 362 V 442" stroke="#FCD34D" stroke-width="18" stroke-linecap="round"/>
+  <path d="M256 395 C 210 375, 185 385, 195 405 C 225 415, 245 405, 256 395 Z" fill="#FCD34D"/>
+  <path d="M256 395 C 302 375, 327 385, 317 405 C 287 415, 267 405, 256 395 Z" fill="#FCD34D"/>
+  <path d="M256 365 C 205 345, 180 355, 190 375 C 220 385, 245 375, 256 365 Z" fill="#FCD34D"/>
+  <path d="M256 365 C 307 345, 332 355, 322 375 C 292 385, 267 375, 256 365 Z" fill="#FCD34D"/>
+  <!-- Circle Star/Badge Emblem -->
+  <circle cx="256" cy="140" r="20" fill="#065F46"/>
+  <circle cx="256" cy="140" r="10" fill="#FCD34D"/>
+</svg>

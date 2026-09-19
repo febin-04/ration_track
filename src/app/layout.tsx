@@ -5,6 +5,11 @@ import { AccessibilityProvider } from "@/context/AccessibilityContext";
 export const metadata: Metadata = {
   title: "RationTrack - Public Ration Shop Stock Visibility Portal (SC-09)",
   description: "Check real-time stock availability at your local Fair Price Shop (Ration Shop) before visiting. Accessible for elderly and low-literacy users.",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

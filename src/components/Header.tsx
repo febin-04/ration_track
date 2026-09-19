@@ -25,8 +25,9 @@ export default function Header({ currentDealerId }: { currentDealerId?: string |
       <div className="max-w-7xl mx-auto px-4 py-3.5 flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Brand & Logo */}
         <Link href="/" className="flex items-center gap-3 group focus:outline-none">
-          <div className="bg-amber-400 text-emerald-950 p-2.5 rounded-xl font-black text-2xl shadow-inner flex items-center justify-center shrink-0">
-            <Store className="w-8 h-8" />
+          <div className="bg-amber-400 text-emerald-950 p-1.5 rounded-xl shadow-inner flex items-center justify-center shrink-0 w-11 h-11 overflow-hidden">
+            {/* Custom RationTrack Logo */}
+            <img src="/icon.svg" alt="RationTrack Logo" className="w-9 h-9 object-contain" />
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white group-hover:text-amber-300 transition-colors">
