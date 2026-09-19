@@ -18,27 +18,34 @@ export default function CitizenHomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItemFilter, setSelectedItemFilter] = useState<string>('all');
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const userLocationRef = React.useRef<{ lat: number; lng: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<'idle' | 'locating' | 'active' | 'error'>('idle');
   const [detectedCity, setDetectedCity] = useState<string>('');
   const [customLocationInput, setCustomLocationInput] = useState<string>('');
   const [locationNotice, setLocationNotice] = useState<string>('');
 
+  const updateUserLocation = (loc: { lat: number; lng: number } | null) => {
+    userLocationRef.current = loc;
+    setUserLocation(loc);
+  };
+
   useEffect(() => {
-    // Initial fetch using server IP location or default
+    // Initial fetch on mount ONCE
     fetchGPSShops();
 
-    // Live auto-polling every 5s so dealer stock updates reflect live to customers
+    // Silent background stock poll every 10s (never triggers re-render loops or resets locationStatus)
     const interval = setInterval(() => {
       fetchGPSShopsSilent();
-    }, 5000);
+    }, 10000);
 
     return () => clearInterval(interval);
-  }, [userLocation]);
+  }, []);
 
   const fetchGPSShopsSilent = async () => {
+    const currentLoc = userLocationRef.current;
     let url = '/api/gps-shops';
-    if (userLocation) {
-      url += `?lat=${userLocation.lat}&lng=${userLocation.lng}`;
+    if (currentLoc) {
+      url += `?lat=${currentLoc.lat}&lng=${currentLoc.lng}`;
     } else {
       url += `?autoIp=true`;
     }
@@ -132,7 +139,7 @@ export default function CitizenHomePage() {
       if (data.success && data.shops) {
         setShops(data.shops);
         if (data.userLocation) {
-          setUserLocation(data.userLocation);
+          updateUserLocation(data.userLocation);
         }
         const cityLabel = data.placeNameEn ? `${data.placeNameEn}` : 'Your Area';
         setDetectedCity(cityLabel);
@@ -163,7 +170,7 @@ export default function CitizenHomePage() {
       if (data.success && data.shops) {
         setShops(data.shops);
         if (data.userLocation) {
-          setUserLocation(data.userLocation);
+          updateUserLocation(data.userLocation);
         }
         setDetectedCity(data.placeNameEn || query);
         setLocationStatus('active');
