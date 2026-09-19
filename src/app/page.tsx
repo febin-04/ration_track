@@ -126,27 +126,10 @@ export default function CitizenHomePage() {
     return { shop, dist };
   });
 
-  // Filter & sort by distance
+  // Filter & sort strictly by nearest distance ascending
   const filteredAndSortedShops = processedShops
     .filter(({ shop }) => {
-      // 1. Text Search Filter (If user typed shop name, area, or ID)
-      const query = searchQuery.toLowerCase().trim();
-      const sName = getShopName(shop, lang).toLowerCase();
-      const sArea = getShopArea(shop, lang).toLowerCase();
-      const matchesSearch =
-        !query ||
-        /^\d{6}$/.test(query) || // If 6-digit pincode, all GPS-resolved shops match
-        sName.includes(query) ||
-        sArea.includes(query) ||
-        shop.name.toLowerCase().includes(query) ||
-        shop.fps_code.toLowerCase().includes(query) ||
-        shop.area.toLowerCase().includes(query) ||
-        shop.pincode.includes(query) ||
-        shop.address.toLowerCase().includes(query);
-
-      if (!matchesSearch) return false;
-
-      // 2. Item Availability Filter
+      // 1. Item Availability Filter
       if (selectedItemFilter !== 'all') {
         const targetStock = shop.stock.find((st) => st.item_key === selectedItemFilter);
         if (!targetStock || targetStock.status === 'OUT_OF_STOCK') {
@@ -154,11 +137,27 @@ export default function CitizenHomePage() {
         }
       }
 
-      return true;
+      const query = searchQuery.toLowerCase().trim();
+      if (!query) return true;
+
+      // If user typed a 6-digit pincode or active search, keep all geocoded proximity shops
+      if (/^\d{6}$/.test(query)) return true;
+
+      const sName = getShopName(shop, lang).toLowerCase();
+      const sArea = getShopArea(shop, lang).toLowerCase();
+      return (
+        sName.includes(query) ||
+        sArea.includes(query) ||
+        shop.name.toLowerCase().includes(query) ||
+        shop.fps_code.toLowerCase().includes(query) ||
+        shop.area.toLowerCase().includes(query) ||
+        shop.pincode.toLowerCase().includes(query) ||
+        shop.address.toLowerCase().includes(query)
+      );
     })
     .sort((a, b) => {
       if (a.dist !== null && b.dist !== null) {
-        return a.dist - b.dist; // Sort by nearest distance
+        return a.dist - b.dist; // Closest shop first (0.4 km -> 1.2 km -> 2.1 km)
       }
       return 0;
     });
