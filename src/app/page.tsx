@@ -86,40 +86,40 @@ export default function CitizenHomePage() {
       return;
     }
 
-    let hasResolved = false;
-
-    // Fast Mobile Positioning (Low Accuracy / Wi-Fi & Cell tower lock - under 300ms on mobile)
+    // Direct single invocation tied to user click event with 15s timeout for mobile permission prompt
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        hasResolved = true;
-        fetchGPSShops(pos.coords.latitude, pos.coords.longitude);
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        fetchGPSShops(lat, lng);
       },
-      (err1) => {
-        console.warn('Fast network location failed, attempting satellite GPS:', err1.message);
-        navigator.geolocation.getCurrentPosition(
-          (pos2) => {
-            hasResolved = true;
-            fetchGPSShops(pos2.coords.latitude, pos2.coords.longitude);
-          },
-          (err2) => {
-            console.warn('Mobile GPS error/fallback:', err2.message);
-            if (err2.code === err2.PERMISSION_DENIED) {
-              setLocationNotice(lang === 'hi' ? 'ब्राउज़र में लोकेशन अनुमति बंद है। नीचे शहर चुनें या पिनकोड दर्ज करें।' : lang === 'ml' ? 'ബ്രൗസർ ലൊക്കേഷൻ തടസ്സപ്പെട്ടു. ദയവായി താഴെ കാണുന്ന സ്ഥലം ക്ലിക്ക് ചെയ്യുക.' : 'Location permission blocked on mobile. Tap a city below or enter pincode.');
-            }
-            fetchGPSShops();
-          },
-          { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
-        );
-      },
-      { enableHighAccuracy: false, timeout: 3500, maximumAge: 300000 }
-    );
-
-    // Mobile Safety Net: Fallback after 5s if phone OS location dialog is ignored
-    setTimeout(() => {
-      if (!hasResolved) {
+      (error) => {
+        console.warn('Mobile Geolocation error:', error.code, error.message);
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationNotice(
+            lang === 'hi'
+              ? 'ब्राउज़र में लोकेशन अनुमति बंद है। नीचे अपना शहर चुनें या पिनकोड दर्ज करें।'
+              : lang === 'ml'
+              ? 'ബ്രൗസർ ലൊക്കേഷൻ തടസ്സപ്പെട്ടു. ദയവായി താഴെ കാണുന്ന സ്ഥലം ക്ലിക്ക് ചെയ്യുക.'
+              : 'Location permission was denied. Tap a city below or enter pincode.'
+          );
+        } else {
+          setLocationNotice(
+            lang === 'hi'
+              ? 'GPS सिग्नल नहीं मिला। आईपी के आधार पर निकटतम दुकानें दिखाई जा रही हैं।'
+              : lang === 'ml'
+              ? 'GPS ലഭിച്ചില്ല. ഐപി അടിസ്ഥാനത്തിൽ അടുത്തുള്ള കടകൾ കാണിക്കുന്നു.'
+              : 'GPS position unavailable. Showing shops near your network location.'
+          );
+        }
         fetchGPSShops();
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 60000,
       }
-    }, 5000);
+    );
   };
 
   const fetchGPSShops = async (lat?: number | null, lng?: number | null) => {

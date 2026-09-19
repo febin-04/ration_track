@@ -170,16 +170,23 @@ export async function GET(request: NextRequest) {
         if (geoRes.ok) {
           const geoData = await geoRes.json();
           const addr = geoData.address || {};
-          const detected = addr.suburb || addr.neighbourhood || addr.village || addr.town || addr.city_district || addr.city || '';
+          const detected = addr.suburb || addr.neighbourhood || addr.village || addr.town || addr.city_district || addr.city || addr.county || addr.state_district || addr.state || '';
           if (detected) {
             placeNameEn = detected;
             placeNameHi = detected;
             placeNameMl = detected;
+          } else {
+            placeNameEn = `GPS Location (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
+            placeNameHi = `GPS स्थान (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
+            placeNameMl = `GPS ലൊക്കേഷൻ (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
           }
-          pincode = addr.postcode || '695001';
+          if (addr.postcode) {
+            pincode = addr.postcode;
+          }
         }
       } catch (e) {
         console.warn('Reverse geocoding error:', e);
+        placeNameEn = `GPS Location (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
       }
     } 
     // Strategy 3: Server-side IP Geolocation Lookup (Vercel Native IP Headers + HTTPS Fallback)
