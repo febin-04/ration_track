@@ -79,43 +79,40 @@ export default function CitizenHomePage() {
       return;
     }
 
-    // Phase 1: High Accuracy GPS (10s timeout)
+    let hasResolved = false;
+
+    // Fast Mobile Positioning (Low Accuracy / Wi-Fi & Cell tower lock - under 300ms on mobile)
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        fetchGPSShops(lat, lng);
+      (pos) => {
+        hasResolved = true;
+        fetchGPSShops(pos.coords.latitude, pos.coords.longitude);
       },
       (err1) => {
-        console.warn('High-accuracy GPS failed/timed out, retrying with network positioning:', err1.message);
-        
-        // Phase 2: Low Accuracy Network Positioning Fallback
+        console.warn('Fast network location failed, attempting satellite GPS:', err1.message);
         navigator.geolocation.getCurrentPosition(
           (pos2) => {
-            const lat = pos2.coords.latitude;
-            const lng = pos2.coords.longitude;
-            fetchGPSShops(lat, lng);
+            hasResolved = true;
+            fetchGPSShops(pos2.coords.latitude, pos2.coords.longitude);
           },
           (err2) => {
-            console.warn('Network GPS permission error/fallback:', err2.message);
+            console.warn('Mobile GPS error/fallback:', err2.message);
             if (err2.code === err2.PERMISSION_DENIED) {
-              setLocationNotice(lang === 'hi' ? 'ब्राउज़र लोकेशन एक्सेस बंद है। नीचे अपना शहर या पिनकोड दर्ज करें।' : lang === 'ml' ? 'ബ്രൗസർ ലൊക്കേഷൻ തടസ്സപ്പെട്ടു. ദയവായി താഴെ സ്ഥലം ടൈപ്പ് ചെയ്യുക.' : 'Browser GPS location permission blocked. Please type your city or pincode below.');
+              setLocationNotice(lang === 'hi' ? 'ब्राउज़र में लोकेशन अनुमति बंद है। नीचे शहर चुनें या पिनकोड दर्ज करें।' : lang === 'ml' ? 'ബ്രൗസർ ലൊക്കേഷൻ തടസ്സപ്പെട്ടു. ദയവായി താഴെ കാണുന്ന സ്ഥലം ക്ലിക്ക് ചെയ്യുക.' : 'Location permission blocked on mobile. Tap a city below or enter pincode.');
             }
             fetchGPSShops();
           },
-          {
-            enableHighAccuracy: false,
-            timeout: 6000,
-            maximumAge: 60000,
-          }
+          { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
         );
       },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
+      { enableHighAccuracy: false, timeout: 3500, maximumAge: 300000 }
     );
+
+    // Mobile Safety Net: Fallback after 5s if phone OS location dialog is ignored
+    setTimeout(() => {
+      if (!hasResolved) {
+        fetchGPSShops();
+      }
+    }, 5000);
   };
 
   const fetchGPSShops = async (lat?: number | null, lng?: number | null) => {
@@ -130,14 +127,14 @@ export default function CitizenHomePage() {
     }
 
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: 'no-store' });
       const data = await res.json();
       if (data.success && data.shops) {
         setShops(data.shops);
         if (data.userLocation) {
           setUserLocation(data.userLocation);
         }
-        const cityLabel = data.placeName ? `${data.placeName}${data.placeDistrict ? ', ' + data.placeDistrict : ''}` : 'Your Area';
+        const cityLabel = data.placeNameEn ? `${data.placeNameEn}` : 'Your Area';
         setDetectedCity(cityLabel);
         setLocationStatus('active');
       }
@@ -152,20 +149,23 @@ export default function CitizenHomePage() {
   const handleCustomLocationSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customLocationInput.trim()) return;
+    executeLocationQuery(customLocationInput.trim());
+  };
 
+  const executeLocationQuery = async (query: string) => {
     setLoading(true);
     setLocationStatus('locating');
     setLocationNotice('');
 
     try {
-      const res = await fetch(`/api/gps-shops?q=${encodeURIComponent(customLocationInput.trim())}`);
+      const res = await fetch(`/api/gps-shops?q=${encodeURIComponent(query)}`, { cache: 'no-store' });
       const data = await res.json();
       if (data.success && data.shops) {
         setShops(data.shops);
         if (data.userLocation) {
           setUserLocation(data.userLocation);
         }
-        setDetectedCity(data.placeName || customLocationInput.trim());
+        setDetectedCity(data.placeNameEn || query);
         setLocationStatus('active');
       }
     } catch (err) {
@@ -328,6 +328,32 @@ export default function CitizenHomePage() {
               </button>
             </div>
           </form>
+
+          {/* Quick Tap Location Chips for Mobile */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <span className="text-[11px] font-bold text-slate-400 mr-1">Quick Select:</span>
+            {[
+              { name: 'Trivandrum', label: '📍 Trivandrum' },
+              { name: 'Kochi', label: '📍 Kochi' },
+              { name: 'Kozhikode', label: '📍 Kozhikode' },
+              { name: 'Thrissur', label: '📍 Thrissur' },
+              { name: 'Kollam', label: '📍 Kollam' },
+              { name: 'Kottayam', label: '📍 Kottayam' },
+              { name: 'Delhi', label: '📍 Delhi' },
+            ].map((city) => (
+              <button
+                key={city.name}
+                type="button"
+                onClick={() => {
+                  setCustomLocationInput(city.name);
+                  executeLocationQuery(city.name);
+                }}
+                className="px-2.5 py-1 bg-slate-100 hover:bg-emerald-100 text-slate-700 hover:text-emerald-900 rounded-lg text-xs font-bold border border-slate-200 min-h-[36px] transition-all"
+              >
+                {city.label}
+              </button>
+            ))}
+          </div>
 
           {locationNotice && (
             <div className="bg-amber-50 text-amber-900 p-3 rounded-xl border border-amber-300 text-xs font-bold flex items-center gap-2">
