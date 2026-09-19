@@ -6,7 +6,7 @@ import ShopCard from '@/components/ShopCard';
 import { Shop, StockItem } from '@/lib/db';
 import { useAccessibility } from '@/context/AccessibilityContext';
 import { calculateDistance } from '@/lib/utils';
-import { Search, MapPin, Filter, Volume2, Sparkles, RefreshCw, CheckCircle2, Navigation, Send, AlertTriangle } from 'lucide-react';
+import { Search, MapPin, Filter, Volume2, Sparkles, RefreshCw, CheckCircle2, X, Building2 } from 'lucide-react';
 import { StockItemIcon } from '@/components/StockStatusBadge';
 import { getShopName, getShopArea } from '@/lib/i18n';
 
@@ -19,10 +19,7 @@ export default function CitizenHomePage() {
   const [selectedItemFilter, setSelectedItemFilter] = useState<string>('all');
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const userLocationRef = React.useRef<{ lat: number; lng: number } | null>(null);
-  const [locationStatus, setLocationStatus] = useState<'idle' | 'locating' | 'active' | 'error'>('idle');
   const [detectedCity, setDetectedCity] = useState<string>('');
-  const [customLocationInput, setCustomLocationInput] = useState<string>('');
-  const [locationNotice, setLocationNotice] = useState<string>('');
 
   const updateUserLocation = (loc: { lat: number; lng: number } | null) => {
     userLocationRef.current = loc;
@@ -30,16 +27,24 @@ export default function CitizenHomePage() {
   };
 
   useEffect(() => {
-    // Initial fetch on mount ONCE
+    // Initial fetch on mount
     fetchGPSShops();
 
-    // Silent background stock poll every 10s (never triggers re-render loops or resets locationStatus)
+    // Silent background stock poll every 10s
     const interval = setInterval(() => {
       fetchGPSShopsSilent();
     }, 10000);
 
     return () => clearInterval(interval);
   }, []);
+
+  // Instant Pincode Auto-Search when user types 6 digits (e.g. 682001, 685586, 695001, 680001)
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (/^\d{6}$/.test(trimmed)) {
+      executeLocationQuery(trimmed);
+    }
+  }, [searchQuery]);
 
   const fetchGPSShopsSilent = async () => {
     const currentLoc = userLocationRef.current;
@@ -61,13 +66,19 @@ export default function CitizenHomePage() {
     }
   };
 
-  const fetchShops = async () => {
+  const fetchGPSShops = async () => {
     setLoading(true);
+
     try {
-      const res = await fetch('/api/shops', { cache: 'no-store' });
+      const res = await fetch('/api/gps-shops?autoIp=true', { cache: 'no-store' });
       const data = await res.json();
-      if (data.success) {
+      if (data.success && data.shops) {
         setShops(data.shops);
+        if (data.userLocation) {
+          updateUserLocation(data.userLocation);
+        }
+        const cityLabel = data.placeNameEn ? `${data.placeNameEn}` : 'Your Region';
+        setDetectedCity(cityLabel);
       }
     } catch (err) {
       console.error('Failed to fetch shops:', err);
@@ -76,93 +87,8 @@ export default function CitizenHomePage() {
     }
   };
 
-  const handleHighAccuracyGPS = () => {
-    setLocationStatus('locating');
-    setLocationNotice('');
-
-    if (!navigator.geolocation) {
-      setLocationNotice(lang === 'hi' ? 'ब्राउज़र में GPS समर्थित नहीं है। नीचे शहर या पिनकोड खोजें।' : lang === 'ml' ? 'ബ്രൗസറിൽ GPS ലഭ്യമല്ല. ദയവായി താഴെ സ്ഥലം തിരയുക.' : 'GPS is not supported in this browser. Please type city or pincode below.');
-      fetchGPSShops();
-      return;
-    }
-
-    // Direct single invocation tied to user click event with 15s timeout for mobile permission prompt
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        fetchGPSShops(lat, lng);
-      },
-      (error) => {
-        console.warn('Mobile Geolocation error:', error.code, error.message);
-        if (error.code === error.PERMISSION_DENIED) {
-          setLocationNotice(
-            lang === 'hi'
-              ? 'ब्राउज़र में लोकेशन अनुमति बंद है। नीचे अपना शहर चुनें या पिनकोड दर्ज करें।'
-              : lang === 'ml'
-              ? 'ബ്രൗസർ ലൊക്കേഷൻ തടസ്സപ്പെട്ടു. ദയവായി താഴെ കാണുന്ന സ്ഥലം ക്ലിക്ക് ചെയ്യുക.'
-              : 'Location permission was denied. Tap a city below or enter pincode.'
-          );
-        } else {
-          setLocationNotice(
-            lang === 'hi'
-              ? 'GPS सिग्नल नहीं मिला। आईपी के आधार पर निकटतम दुकानें दिखाई जा रही हैं।'
-              : lang === 'ml'
-              ? 'GPS ലഭിച്ചില്ല. ഐപി അടിസ്ഥാനത്തിൽ അടുത്തുള്ള കടകൾ കാണിക്കുന്നു.'
-              : 'GPS position unavailable. Showing shops near your network location.'
-          );
-        }
-        fetchGPSShops();
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 60000,
-      }
-    );
-  };
-
-  const fetchGPSShops = async (lat?: number | null, lng?: number | null) => {
-    setLoading(true);
-    setLocationStatus('locating');
-
-    let url = '/api/gps-shops';
-    if (lat !== undefined && lat !== null && lng !== undefined && lng !== null) {
-      url += `?lat=${lat}&lng=${lng}`;
-    } else {
-      url += `?autoIp=true`;
-    }
-
-    try {
-      const res = await fetch(url, { cache: 'no-store' });
-      const data = await res.json();
-      if (data.success && data.shops) {
-        setShops(data.shops);
-        if (data.userLocation) {
-          updateUserLocation(data.userLocation);
-        }
-        const cityLabel = data.placeNameEn ? `${data.placeNameEn}` : 'Your Area';
-        setDetectedCity(cityLabel);
-        setLocationStatus('active');
-      }
-    } catch (err) {
-      console.error('Failed to fetch GPS shops:', err);
-      setLocationStatus('error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCustomLocationSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customLocationInput.trim()) return;
-    executeLocationQuery(customLocationInput.trim());
-  };
-
   const executeLocationQuery = async (query: string) => {
     setLoading(true);
-    setLocationStatus('locating');
-    setLocationNotice('');
 
     try {
       const res = await fetch(`/api/gps-shops?q=${encodeURIComponent(query)}`, { cache: 'no-store' });
@@ -173,13 +99,23 @@ export default function CitizenHomePage() {
           updateUserLocation(data.userLocation);
         }
         setDetectedCity(data.placeNameEn || query);
-        setLocationStatus('active');
       }
     } catch (err) {
-      console.error('Failed to search custom location:', err);
+      console.error('Failed to search location:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    executeLocationQuery(searchQuery.trim());
+  };
+
+  const handlePincodeChipClick = (pincode: string) => {
+    setSearchQuery(pincode);
+    executeLocationQuery(pincode);
   };
 
   // Process shop list with calculated distances
@@ -193,12 +129,13 @@ export default function CitizenHomePage() {
   // Filter & sort by distance
   const filteredAndSortedShops = processedShops
     .filter(({ shop }) => {
-      // 1. Text Search Filter
+      // 1. Text Search Filter (If user typed shop name, area, or ID)
       const query = searchQuery.toLowerCase().trim();
       const sName = getShopName(shop, lang).toLowerCase();
       const sArea = getShopArea(shop, lang).toLowerCase();
       const matchesSearch =
         !query ||
+        /^\d{6}$/.test(query) || // If 6-digit pincode, all GPS-resolved shops match
         sName.includes(query) ||
         sArea.includes(query) ||
         shop.name.toLowerCase().includes(query) ||
@@ -209,7 +146,7 @@ export default function CitizenHomePage() {
 
       if (!matchesSearch) return false;
 
-      // 2. Item Availability Filter ("Show me shops near me that have [item] in stock")
+      // 2. Item Availability Filter
       if (selectedItemFilter !== 'all') {
         const targetStock = shop.stock.find((st) => st.item_key === selectedItemFilter);
         if (!targetStock || targetStock.status === 'OUT_OF_STOCK') {
@@ -235,7 +172,7 @@ export default function CitizenHomePage() {
     const availableCount = filteredAndSortedShops.length;
     const textToRead =
       lang === 'hi'
-        ? `राशन दुकान पोर्टल। आपके क्षेत्र में ${availableCount} राशन दुकानें पाई गईं। स्थान के आधार पर निकटतम दुकानें देखने के लिए जीपीएस बटन दबाएं।`
+        ? `राशन दुकान पोर्टल। आपके क्षेत्र में ${availableCount} राशन दुकानें पाई गईं। आप चावल, गेहूं, चीनी, केरोसिन और तेल की स्थिति देख सकते हैं।`
         : lang === 'ml'
         ? `റേഷൻ കട പോർട്ടൽ. ${availableCount} റേഷൻ കടകൾ ലഭ്യമാണ്. അരി, ഗോതമ്പ്, പഞ്ചസാര, മണ്ണെണ്ണ, എണ്ണ ലഭ്യത ഇവിടെ പരിശോധിക്കാം.`
         : `Ration Shop Portal. ${availableCount} shops found near your search criteria. You can check stock status for rice, wheat, sugar, kerosene, and oil.`;
@@ -276,114 +213,85 @@ export default function CitizenHomePage() {
           </button>
         </section>
 
-        {/* GPS Search & Location Input Bar */}
-        <section className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-slate-200 shadow-sm flex flex-col gap-4">
-          <div className="flex flex-col md:flex-row gap-3">
-            {/* Search Shop Input */}
+        {/* Pincode & Location Search Bar */}
+        <section className="bg-white p-5 rounded-3xl border-2 border-slate-200 shadow-sm flex flex-col gap-4">
+          <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-3">
+            {/* Main Search Input */}
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t.searchPlaceholder}
-                className="w-full pl-12 pr-4 py-3.5 rounded-xl border-2 border-slate-300 focus:border-emerald-600 text-slate-900 placeholder:text-slate-400 text-sm sm:text-base min-h-[50px]"
+                placeholder="Enter 6-digit Pincode (e.g. 682001, 685586, 695001) or Area / Shop name..."
+                className="w-full pl-12 pr-10 py-3.5 rounded-2xl border-2 border-slate-300 focus:border-emerald-600 text-slate-900 font-bold placeholder:text-slate-400 text-sm sm:text-base min-h-[52px]"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    fetchGPSShops();
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
             </div>
 
-            {/* High-Accuracy GPS Button */}
+            {/* Search Button */}
             <button
-              onClick={handleHighAccuracyGPS}
-              disabled={locationStatus === 'locating'}
-              className={`min-h-[50px] px-6 py-3.5 rounded-xl font-extrabold text-sm sm:text-base transition-all flex items-center justify-center gap-2.5 shadow-md border-2 shrink-0 ${
-                locationStatus === 'active'
-                  ? 'bg-amber-400 text-emerald-950 border-amber-500 ring-2 ring-amber-300'
-                  : 'bg-emerald-700 hover:bg-emerald-800 text-white border-emerald-800'
-              }`}
+              type="submit"
+              className="min-h-[52px] px-7 py-3.5 bg-emerald-800 hover:bg-emerald-900 active:bg-emerald-950 text-white font-extrabold rounded-2xl transition-all flex items-center justify-center gap-2.5 shadow-md border-2 border-emerald-900 shrink-0 text-sm sm:text-base"
             >
-              <Navigation className={`w-5 h-5 ${locationStatus === 'locating' ? 'animate-spin' : ''}`} />
-              <span>
-                {locationStatus === 'locating'
-                  ? 'Detecting GPS Location...'
-                  : locationStatus === 'active'
-                  ? t.gpsActive
-                  : t.useGPS}
-              </span>
+              <Search className="w-5 h-5 text-amber-400" />
+              <span>Search Shops</span>
             </button>
-          </div>
-
-          {/* Manual Area / City / Pincode Search Bar */}
-          <form onSubmit={handleCustomLocationSearch} className="flex flex-col sm:flex-row items-center gap-2.5 pt-2 border-t border-slate-100">
-            <span className="text-xs font-black text-slate-500 flex items-center gap-1 shrink-0">
-              <MapPin className="w-4 h-4 text-emerald-700" />
-              <span>{lang === 'hi' ? 'स्थान / पिनकोड दर्ज करें:' : lang === 'ml' ? 'സ്ഥലം / പിൻകോഡ് നൽകുക:' : 'Enter City or Pincode:'}</span>
-            </span>
-            <div className="flex-1 w-full flex items-center gap-2">
-              <input
-                type="text"
-                value={customLocationInput}
-                onChange={(e) => setCustomLocationInput(e.target.value)}
-                placeholder="e.g. Kollam, Thrissur, Pathanamthitta, 682001..."
-                className="flex-1 px-3.5 py-2 rounded-lg border-2 border-slate-300 font-bold text-slate-900 text-xs sm:text-sm focus:border-emerald-600 min-h-[42px]"
-              />
-              <button
-                type="submit"
-                className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold rounded-lg text-xs sm:text-sm min-h-[42px] flex items-center gap-1.5 shrink-0"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>Locate Area</span>
-              </button>
-            </div>
           </form>
 
-          {/* Quick Tap Location Chips for Mobile */}
-          <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            <span className="text-[11px] font-bold text-slate-400 mr-1">Quick Select:</span>
+          {/* Quick Pincode Chips */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+            <span className="text-xs font-black text-slate-500 flex items-center gap-1 shrink-0 uppercase tracking-wider">
+              <MapPin className="w-4 h-4 text-emerald-700" />
+              <span>Quick Pincode Select:</span>
+            </span>
             {[
-              { name: 'Trivandrum', label: '📍 Trivandrum' },
-              { name: 'Kochi', label: '📍 Kochi' },
-              { name: 'Kozhikode', label: '📍 Kozhikode' },
-              { name: 'Thrissur', label: '📍 Thrissur' },
-              { name: 'Kollam', label: '📍 Kollam' },
-              { name: 'Kottayam', label: '📍 Kottayam' },
-              { name: 'Delhi', label: '📍 Delhi' },
-            ].map((city) => (
+              { code: '685586', label: '685586 (Idukki)' },
+              { code: '682001', label: '682001 (Kochi)' },
+              { code: '695001', label: '695001 (Trivandrum)' },
+              { code: '680001', label: '680001 (Thrissur)' },
+              { code: '691001', label: '691001 (Kollam)' },
+              { code: '686001', label: '686001 (Kottayam)' },
+              { code: '110001', label: '110001 (Delhi)' },
+            ].map((pin) => (
               <button
-                key={city.name}
+                key={pin.code}
                 type="button"
-                onClick={() => {
-                  setCustomLocationInput(city.name);
-                  executeLocationQuery(city.name);
-                }}
-                className="px-2.5 py-1 bg-slate-100 hover:bg-emerald-100 text-slate-700 hover:text-emerald-900 rounded-lg text-xs font-bold border border-slate-200 min-h-[36px] transition-all"
+                onClick={() => handlePincodeChipClick(pin.code)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all border-2 flex items-center gap-1 min-h-[38px] ${
+                  searchQuery.trim() === pin.code
+                    ? 'bg-amber-400 text-emerald-950 border-amber-500 shadow-sm ring-2 ring-amber-300'
+                    : 'bg-slate-100 hover:bg-emerald-50 text-slate-800 border-slate-200 hover:border-emerald-300'
+                }`}
               >
-                {city.label}
+                <span>📍</span>
+                <span>{pin.label}</span>
               </button>
             ))}
           </div>
 
-          {locationNotice && (
-            <div className="bg-amber-50 text-amber-900 p-3 rounded-xl border border-amber-300 text-xs font-bold flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>{locationNotice}</span>
-            </div>
-          )}
-
-          {/* GPS Active Notification Banner */}
-          {userLocation && (
-            <div className="bg-emerald-50 text-emerald-950 p-3.5 rounded-xl border-2 border-emerald-300 text-xs sm:text-sm font-extrabold flex items-center justify-between gap-2 shadow-2xs">
+          {/* Active Area Banner */}
+          {detectedCity && (
+            <div className="bg-emerald-50 text-emerald-950 p-3.5 rounded-2xl border-2 border-emerald-300 text-xs sm:text-sm font-extrabold flex items-center justify-between gap-2 shadow-2xs">
               <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-emerald-700 shrink-0 animate-bounce" />
+                <Building2 className="w-4 h-4 text-emerald-700 shrink-0" />
                 <span>
-                  {lang === 'hi'
-                    ? `📍 सक्रिय स्थान: ${detectedCity} (Lat: ${userLocation.lat.toFixed(4)}, Lng: ${userLocation.lng.toFixed(4)})`
-                    : lang === 'ml'
-                    ? `📍 കണ്ടെത്തിയ സ്ഥലം: ${detectedCity} (ലൊക്കേഷൻ: ${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)})`
-                    : `📍 Active Location: Fair Price Shops near ${detectedCity} (${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)})`}
+                  📍 {lang === 'hi' ? `सक्रिय क्षेत्र / पिनकोड: ${detectedCity}` : lang === 'ml' ? `തിരഞ്ഞെടുത്ത പ്രദേശം / പിൻകോഡ്: ${detectedCity}` : `Showing Ration Shops near Pincode / Area: ${detectedCity}`}
                 </span>
               </div>
-              <span className="bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded text-xs font-black">
-                Proximity Sorted
+              <span className="bg-emerald-200 text-emerald-950 px-3 py-1 rounded-lg text-xs font-black shrink-0">
+                Pincode Filtered
               </span>
             </div>
           )}
@@ -442,7 +350,7 @@ export default function CitizenHomePage() {
             </h2>
 
             <button
-              onClick={fetchShops}
+              onClick={fetchGPSShops}
               className="text-xs font-bold text-emerald-800 hover:text-emerald-950 flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 min-h-[38px]"
             >
               <RefreshCw className="w-3.5 h-3.5" />
@@ -463,6 +371,7 @@ export default function CitizenHomePage() {
                 onClick={() => {
                   setSearchQuery('');
                   setSelectedItemFilter('all');
+                  fetchGPSShops();
                 }}
                 className="mt-2 text-sm font-bold text-emerald-800 hover:underline"
               >
