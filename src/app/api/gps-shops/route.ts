@@ -1,6 +1,9 @@
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { NextRequest, NextResponse } from 'next/server';
 import { calculateDistance } from '@/lib/utils';
-import { StockItem } from '@/lib/db';
+import { getAllShops, StockItem } from '@/lib/db';
 
 interface GPSShop {
   id: string;
@@ -285,14 +288,16 @@ export async function GET(request: NextRequest) {
       },
     ];
 
+    const dbShops = getAllShops();
     const dealers = ['K. Ramesh Kumar', 'Sunita Devi', 'Anil V. Nair', 'Mohd. Imran', 'Suresh V. Kurup', 'Pooja Sharma'];
     const phones = ['+91 98765 43210', '+91 98112 23344', '+91 97177 88990', '+91 99554 11223', '+91 98450 67890', '+91 96543 21098'];
 
     const gpsShops: GPSShop[] = landmarks.map((lm, i) => {
+      const dbShop = dbShops[i] || dbShops.find(s => s.fps_code.includes(lm.code) || s.id.includes(lm.code));
       const shopLat = lat + lm.dLat;
       const shopLng = lng + lm.dLng;
-      const fpsCode = `FPS-${pincode.slice(0, 3)}-${lm.code}`;
-      const shopId = `shop-gps-${lm.code}`;
+      const fpsCode = dbShop ? dbShop.fps_code : `FPS-${pincode.slice(0, 3)}-${lm.code}`;
+      const shopId = dbShop ? dbShop.id : `shop-gps-${lm.code}`;
 
       const nameEn = `${placeNameEn} ${lm.tagEn} FPS #${lm.code}`;
       const nameHi = `${placeNameHi} ${lm.tagHi} राशन दुकान #${lm.code}`;
@@ -312,8 +317,8 @@ export async function GET(request: NextRequest) {
         name: nameEn,
         name_hi: nameHi,
         name_ml: nameMl,
-        dealer_name: dealers[i],
-        phone: phones[i],
+        dealer_name: dbShop ? dbShop.dealer_name : dealers[i],
+        phone: dbShop ? dbShop.phone : phones[i],
         address: addrEn,
         address_hi: addrHi,
         address_ml: addrMl,
@@ -325,8 +330,8 @@ export async function GET(request: NextRequest) {
         lng: shopLng,
         operating_hours: '08:00 AM - 06:30 PM (Closed on Mon)',
         pin: 'pin123',
-        confirmationsCount: { match: 8 + i * 3, mismatch: i },
-        stock: [
+        confirmationsCount: dbShop ? dbShop.confirmationsCount : { match: 8 + i * 3, mismatch: i },
+        stock: dbShop ? dbShop.stock : [
           {
             id: `${shopId}-rice`,
             shop_id: shopId,

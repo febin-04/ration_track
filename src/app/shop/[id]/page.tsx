@@ -42,12 +42,31 @@ export default function ShopDetailPage({ params }: { params: Promise<{ id: strin
 
   useEffect(() => {
     fetchShopDetail();
+
+    // Live auto-polling every 5s so dealer stock updates reflect live to customers
+    const interval = setInterval(() => {
+      fetchShopDetailSilent();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [id]);
+
+  const fetchShopDetailSilent = async () => {
+    try {
+      const res = await fetch(`/api/shops/${id}`, { cache: 'no-store' });
+      const data = await res.json();
+      if (data.success) {
+        setShop(data.shop);
+      }
+    } catch (err) {
+      // silent fail
+    }
+  };
 
   const fetchShopDetail = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/shops/${id}`);
+      const res = await fetch(`/api/shops/${id}`, { cache: 'no-store' });
       const data = await res.json();
       if (data.success) {
         setShop(data.shop);

@@ -26,12 +26,38 @@ export default function CitizenHomePage() {
   useEffect(() => {
     // Initial fetch using server IP location or default
     fetchGPSShops();
-  }, []);
+
+    // Live auto-polling every 5s so dealer stock updates reflect live to customers
+    const interval = setInterval(() => {
+      fetchGPSShopsSilent();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [userLocation]);
+
+  const fetchGPSShopsSilent = async () => {
+    let url = '/api/gps-shops';
+    if (userLocation) {
+      url += `?lat=${userLocation.lat}&lng=${userLocation.lng}`;
+    } else {
+      url += `?autoIp=true`;
+    }
+
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      const data = await res.json();
+      if (data.success && data.shops) {
+        setShops(data.shops);
+      }
+    } catch (err) {
+      // silent fail
+    }
+  };
 
   const fetchShops = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/shops');
+      const res = await fetch('/api/shops', { cache: 'no-store' });
       const data = await res.json();
       if (data.success) {
         setShops(data.shops);
