@@ -182,24 +182,37 @@ export async function GET(request: NextRequest) {
         console.warn('Reverse geocoding error:', e);
       }
     } 
-    // Strategy 3: Server-side IP Geolocation Lookup
+    // Strategy 3: Server-side IP Geolocation Lookup (Vercel Native IP Headers + HTTPS Fallback)
     else {
-      try {
-        const ipRes = await fetch('http://ip-api.com/json/?fields=status,country,regionName,city,zip,lat,lon');
-        if (ipRes.ok) {
-          const ipData = await ipRes.json();
-          if (ipData.status === 'success' && ipData.lat && ipData.lon) {
-            lat = ipData.lat;
-            lng = ipData.lon;
-            const city = ipData.city || ipData.regionName || 'Local Region';
-            placeNameEn = city;
-            placeNameHi = city;
-            placeNameMl = city;
-            pincode = ipData.zip || '695001';
+      const vercelLat = request.headers.get('x-vercel-ip-latitude');
+      const vercelLng = request.headers.get('x-vercel-ip-longitude');
+      const vercelCity = request.headers.get('x-vercel-ip-city');
+
+      if (vercelLat && vercelLng && !isNaN(parseFloat(vercelLat)) && !isNaN(parseFloat(vercelLng))) {
+        lat = parseFloat(vercelLat);
+        lng = parseFloat(vercelLng);
+        const city = vercelCity ? decodeURIComponent(vercelCity) : 'Local Region';
+        placeNameEn = city;
+        placeNameHi = city;
+        placeNameMl = city;
+      } else {
+        try {
+          const ipRes = await fetch('https://ipapi.co/json/', { cache: 'no-store' });
+          if (ipRes.ok) {
+            const ipData = await ipRes.json();
+            if (ipData && ipData.latitude && ipData.longitude) {
+              lat = ipData.latitude;
+              lng = ipData.longitude;
+              const city = ipData.city || ipData.region || 'Local Region';
+              placeNameEn = city;
+              placeNameHi = city;
+              placeNameMl = city;
+              pincode = ipData.postal || '695001';
+            }
           }
+        } catch (e) {
+          console.warn('IP lookup error:', e);
         }
-      } catch (e) {
-        console.warn('IP-API lookup error:', e);
       }
     }
 

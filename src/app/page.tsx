@@ -73,45 +73,49 @@ export default function CitizenHomePage() {
     setLocationStatus('locating');
     setLocationNotice('');
 
-    let hasResponded = false;
-
-    // Fast 2.5s fallback timer in case Windows desktop GPS hangs
-    const fallbackTimer = setTimeout(() => {
-      if (!hasResponded) {
-        hasResponded = true;
-        console.warn('Browser GPS took longer than 2.5s, using network location...');
-        fetchGPSShops();
-      }
-    }, 2500);
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          if (hasResponded) return;
-          hasResponded = true;
-          clearTimeout(fallbackTimer);
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          fetchGPSShops(lat, lng);
-        },
-        (error) => {
-          if (hasResponded) return;
-          hasResponded = true;
-          clearTimeout(fallbackTimer);
-          console.warn('System GPS permission error/fallback:', error.message);
-          setLocationNotice(lang === 'hi' ? 'ब्राउज़र लोकेशन एक्सेस बंद है। नीचे अपना शहर या पिनकोड दर्ज करें।' : lang === 'ml' ? 'ബ്രൗസർ ലൊക്കേഷൻ ആക്സസ് തടസ്സപ്പെട്ടു. ദയവായി താഴെ സ്ഥലം ടൈപ്പ് ചെയ്യുക.' : 'Browser GPS location permission blocked. Please type your city or pincode below.');
-          fetchGPSShops();
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 5000,
-          maximumAge: 0,
-        }
-      );
-    } else {
-      clearTimeout(fallbackTimer);
+    if (!navigator.geolocation) {
+      setLocationNotice(lang === 'hi' ? 'ब्राउज़र में GPS समर्थित नहीं है। नीचे शहर या पिनकोड खोजें।' : lang === 'ml' ? 'ബ്രൗസറിൽ GPS ലഭ്യമല്ല. ദയവായി താഴെ സ്ഥലം തിരയുക.' : 'GPS is not supported in this browser. Please type city or pincode below.');
       fetchGPSShops();
+      return;
     }
+
+    // Phase 1: High Accuracy GPS (10s timeout)
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        fetchGPSShops(lat, lng);
+      },
+      (err1) => {
+        console.warn('High-accuracy GPS failed/timed out, retrying with network positioning:', err1.message);
+        
+        // Phase 2: Low Accuracy Network Positioning Fallback
+        navigator.geolocation.getCurrentPosition(
+          (pos2) => {
+            const lat = pos2.coords.latitude;
+            const lng = pos2.coords.longitude;
+            fetchGPSShops(lat, lng);
+          },
+          (err2) => {
+            console.warn('Network GPS permission error/fallback:', err2.message);
+            if (err2.code === err2.PERMISSION_DENIED) {
+              setLocationNotice(lang === 'hi' ? 'ब्राउज़र लोकेशन एक्सेस बंद है। नीचे अपना शहर या पिनकोड दर्ज करें।' : lang === 'ml' ? 'ബ്രൗസർ ലൊക്കേഷൻ തടസ്സപ്പെട്ടു. ദയവായി താഴെ സ്ഥലം ടൈപ്പ് ചെയ്യുക.' : 'Browser GPS location permission blocked. Please type your city or pincode below.');
+            }
+            fetchGPSShops();
+          },
+          {
+            enableHighAccuracy: false,
+            timeout: 6000,
+            maximumAge: 60000,
+          }
+        );
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
   };
 
   const fetchGPSShops = async (lat?: number | null, lng?: number | null) => {
